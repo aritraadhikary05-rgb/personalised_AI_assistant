@@ -16,6 +16,13 @@ import javax.crypto.spec.GCMParameterSpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Per-installation AI provider settings. API credentials are encrypted with an
@@ -88,6 +95,188 @@ class ThorAiProviderManager(private val context: Context) {
 
     fun clearKey(provider: Provider) {
         prefs.edit().remove("api_key_${provider.name}").apply()
+    }
+
+    private val httpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(45, TimeUnit.SECONDS)
+            .writeTimeout(12, TimeUnit.SECONDS)
+            .callTimeout(60, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .build()
+    }
+
+    /**
+     * Streams text as soon as the provider emits it. The callback runs on the
+     * IO dispatcher; callers must marshal UI updates to the main thread.
+     */
+    suspend fun askStreaming(
+        prompt: String,
+        maxTokens: Int = 256,
+        onChunk: (String) -> Unit
+    ): String = withContext(Dispatchers.IO) {
+        val config = settings()
+        val blockedUntil = prefs.getLong("cooldown_until_${config.provider.name}", 0L)
+        if (System.currentTimeMillis() < blockedUntil) {
+            val seconds = ((blockedUntil - System.currentTimeMillis()) / 1000L).coerceAtLeast(1L)
+            error("${config.provider.title} is rate-limited. Try again in about $seconds seconds.")
+        }
+        require(config.provider != Provider.LOCAL) { "Local AI is selected." }
+        require(config.provider != Provider.GEMINI) { "Firebase Gemini uses GeminiAssistant streaming." }
+        require(config.apiKey.isNotBlank()) { "Add an API key for ${config.provider.title} in AI Provider settings." }
+        require(config.model.isNotBlank()) { "Enter a model name." }
+
+        val output = StringBuilder()
+        val emit: (String) -> Unit = { chunk ->
+            if (chunk.isNotEmpty()) {
+                output.append(chunk)
+                onChunk(chunk)
+            }
+        }
+        when (config.provider) {
+            Provider.CLAUDE -> streamClaude(config, prompt, maxTokens, emit)
+            Provider.GEMINI_API -> streamGeminiApi(config, prompt, maxTokens, emit)
+            else -> streamOpenAiCompatible(config, prompt, maxTokens, emit)
+        }
+        output.toString().trim().ifBlank { error("${config.provider.title} returned an empty response.") }
+    }
+
+    private fun streamOpenAiCompatible(
+        config: Settings, prompt: String, maxTokens: Int, emit: (String) -> Unit
+    ) {
+        val endpoint = config.endpoint.trim()
+        require(endpoint.startsWith("https://", true)) { "Provider endpoint must use HTTPS." }
+        val body = JSONObject()
+            .put("model", config.model)
+            .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", prompt.take(4000))))
+            .put("max_tokens", maxTokens.coerceIn(64, 512))
+            .put("temperature", 0.4)
+            .put("stream", true)
+        val request = Request.Builder().url(endpoint)
+            .header("Authorization", "Bearer ${config.apiKey}")
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream")
+            .apply {
+                if (config.provider == Provider.OPENROUTER) {
+                    header("HTTP-Referer", "https://github.com/aritraadhikary05-rgb/personalised_AI_assistant")
+                    header("X-Title", "THOR Android Assistant")
+                }
+            }
+            .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .build()
+        httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw providerHttpError(config, response.code, response.body?.string().orEmpty())
+            val reader = response.body?.charStream()?.buffered() ?: error("Provider returned an empty stream.")
+            reader.useLines { lines ->
+                lines.forEach { line ->
+                    if (line.startsWith("data:")) {
+                        val data = line.substringAfter("data:").trim()
+                        if (data.isNotEmpty() && data != "[DONE]") {
+                            val json = runCatching { JSONObject(data) }.getOrNull() ?: return@forEach
+                            val delta = json.optJSONArray("choices")?.optJSONObject(0)
+                                ?.optJSONObject("delta")?.opt("content")
+                            when (delta) {
+                                is String -> emit(delta)
+                                is JSONArray -> for (i in 0 until delta.length()) {
+                                    val item = delta.optJSONObject(i)
+                                    emit(item?.optString("text").orEmpty())
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun streamClaude(
+        config: Settings, prompt: String, maxTokens: Int, emit: (String) -> Unit
+    ) {
+        val endpoint = config.endpoint.trim()
+        require(endpoint.startsWith("https://", true)) { "Claude endpoint must use HTTPS." }
+        val body = JSONObject()
+            .put("model", config.model)
+            .put("max_tokens", maxTokens.coerceIn(64, 512))
+            .put("stream", true)
+            .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", prompt.take(4000))))
+        val request = Request.Builder().url(endpoint)
+            .header("x-api-key", config.apiKey)
+            .header("anthropic-version", "2023-06-01")
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream")
+            .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .build()
+        httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw providerHttpError(config, response.code, response.body?.string().orEmpty())
+            val reader = response.body?.charStream()?.buffered() ?: error("Claude returned an empty stream.")
+            reader.useLines { lines ->
+                lines.forEach { line ->
+                    if (line.startsWith("data:")) {
+                        val json = runCatching { JSONObject(line.substringAfter("data:").trim()) }.getOrNull()
+                            ?: return@forEach
+                        if (json.optString("type") == "content_block_delta") {
+                            emit(json.optJSONObject("delta")?.optString("text").orEmpty())
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun streamGeminiApi(
+        config: Settings, prompt: String, maxTokens: Int, emit: (String) -> Unit
+    ) {
+        val base = config.endpoint.trim().replace("{model}", config.model)
+        require(base.startsWith("https://", true)) { "Gemini endpoint must use HTTPS." }
+        val streamUrl = base.replace(":generateContent", ":streamGenerateContent") +
+            if (base.contains("?")) "&alt=sse" else "?alt=sse"
+        val body = JSONObject()
+            .put("contents", JSONArray().put(JSONObject().put("role", "user")
+                .put("parts", JSONArray().put(JSONObject().put("text", prompt.take(4000))))))
+            .put("generationConfig", JSONObject().put("maxOutputTokens", maxTokens.coerceIn(64, 512)))
+        val request = Request.Builder().url(streamUrl)
+            .header("x-goog-api-key", config.apiKey)
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream")
+            .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .build()
+        httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw providerHttpError(config, response.code, response.body?.string().orEmpty())
+            val reader = response.body?.charStream()?.buffered() ?: error("Gemini returned an empty stream.")
+            reader.useLines { lines ->
+                lines.forEach { line ->
+                    if (line.startsWith("data:")) {
+                        val json = runCatching { JSONObject(line.substringAfter("data:").trim()) }.getOrNull()
+                            ?: return@forEach
+                        val parts = json.optJSONArray("candidates")?.optJSONObject(0)
+                            ?.optJSONObject("content")?.optJSONArray("parts") ?: return@forEach
+                        for (i in 0 until parts.length()) emit(parts.optJSONObject(i)?.optString("text").orEmpty())
+                    }
+                }
+            }
+        }
+    }
+
+    private fun providerHttpError(config: Settings, status: Int, raw: String): Exception {
+        val detail = runCatching {
+            JSONObject(raw).optJSONObject("error")?.optString("message")
+                ?: JSONObject(raw).optString("message")
+        }.getOrNull().orEmpty().take(220).ifBlank { "HTTP $status" }
+        if (status == 429) {
+            val retrySeconds = runCatching {
+                Regex("retry in ([0-9.]+)s", RegexOption.IGNORE_CASE).find(detail)
+                    ?.groupValues?.get(1)?.toDouble()?.toLong()
+            }.getOrNull() ?: 60L
+            val cooldownMs = (retrySeconds.coerceIn(30L, 900L)) * 1000L
+            prefs.edit().putLong("cooldown_until_${config.provider.name}", System.currentTimeMillis() + cooldownMs).apply()
+        }
+        return IllegalStateException(when (status) {
+            401, 403 -> "${config.provider.title} rejected the API key or permissions ($detail)."
+            429 -> "${config.provider.title} rate limit reached. THOR paused requests briefly to avoid repeated failures. ($detail)"
+            408, 500, 502, 503, 504, 529 -> "${config.provider.title} is temporarily unavailable ($detail)."
+            else -> "${config.provider.title} request failed ($detail)."
+        })
     }
 
     suspend fun ask(prompt: String, maxTokens: Int = 192): String = withContext(Dispatchers.IO) {
