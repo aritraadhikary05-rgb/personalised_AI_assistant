@@ -156,7 +156,7 @@ class ThorTerminalActivity : Activity() {
             command.equals("help", true) -> {
                 append("Commands: help, pwd, ls, cd, mkdir, touch, cat, echo, date, whoami, clear")
                 append("Only THOR's restricted app-private commands are supported; arbitrary Android shell commands are disabled.")
-                append("AI coding: type ask <what you want built> or use ASK THOR AI.")
+                append("AI coding: use ask <what you want built> or ASK THOR AI. THOR generates supported workspace commands, not general shell scripts.")
                 appendPrompt()
             }
             command.equals("pwd", true) -> { append(currentDirectory.absolutePath); appendPrompt() }
@@ -371,14 +371,19 @@ class ThorTerminalActivity : Activity() {
                 val provider = ThorAiProviderManager(this@ThorTerminalActivity)
                 val settings = provider.settings()
                 val prompt = """
-                    You are THOR's coding assistant for its built-in Android app terminal.
-                    Produce one POSIX /system/bin/sh script for the user's task.
-                    The script runs with the app's ordinary Android UID in this private working directory:
-                    ${workspace.absolutePath}
-                    Do not use root, sudo, su, package managers, Android settings commands, protected paths,
-                    network downloads, destructive recursive deletion, or commands that leave this directory.
-                    Prefer creating useful files in the current directory. Keep the script concise.
-                    Return a short explanation followed by exactly one fenced bash code block.
+                    You are THOR's coding assistant for its built-in restricted Android workspace.
+                    Produce a sequence of THOR interpreter commands, NOT a POSIX or Android shell script.
+                    The commands run inside this private working directory: ${workspace.absolutePath}
+                    Supported commands only: help, pwd, whoami, date, echo <text>, ls [path], mkdir <name>,
+                    touch <file>, write <file> <text>, cat <file>, clear, cls.
+                    Put exactly one command on each line. Use paths relative to the workspace only.
+                    Create parent folders first with mkdir; mkdir does not create nested folders automatically.
+                    Use write <file> <text> to create or replace a one-line text file.
+                    Do not use cd, shell operators, pipes, redirection, variables, substitutions, loops, conditions,
+                    functions, command chaining, absolute paths, network access, or unsupported commands.
+                    Avoid these characters in command arguments: ; | & $ ( ) < > backtick and backslash.
+                    Keep the plan concise and ensure every line is a supported THOR command.
+                    Return a short explanation followed by exactly one fenced text code block containing only commands.
                     User task: ${task.take(1200)}
                 """.trimIndent()
                 val answer = when (settings.provider) {
