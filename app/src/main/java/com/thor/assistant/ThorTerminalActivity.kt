@@ -59,9 +59,9 @@ class ThorTerminalActivity : Activity() {
     }
 
     private fun buildTerminalUi() {
-        val background = Color.rgb(7, 12, 18)
-        val panel = Color.rgb(15, 24, 34)
-        val green = Color.rgb(112, 235, 164)
+        val background = Color.rgb(11, 13, 18)
+        val panel = Color.rgb(25, 28, 35)
+        val green = Color.rgb(10, 132, 255)
         val muted = Color.rgb(145, 166, 185)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -86,7 +86,7 @@ class ThorTerminalActivity : Activity() {
 
         val terminalScroll = ScrollView(this).apply {
             isFillViewport = true
-            setBackgroundColor(panel)
+            background = terminalSurface(panel)
             setPadding(dp(10), dp(10), dp(10), dp(10))
         }
         output = TextView(this).apply {
@@ -115,7 +115,7 @@ class ThorTerminalActivity : Activity() {
             setHintTextColor(muted)
             setTextColor(Color.WHITE)
             setPadding(dp(10), 0, dp(10), 0)
-            setBackgroundColor(panel)
+            background = terminalSurface(panel)
             imeOptions = EditorInfo.IME_ACTION_SEND
             setOnEditorActionListener { _, actionId, _ ->
                 if (actionId == EditorInfo.IME_ACTION_SEND) { runManualCommand(); true } else false
@@ -348,6 +348,15 @@ class ThorTerminalActivity : Activity() {
         commandInput.isEnabled = !value
         runButton.text = if (value) "RUNNING..." else "RUN"
     }
+
+
+    private fun terminalSurface(fill: Int): android.graphics.drawable.Drawable =
+        android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            cornerRadius = dp(16).toFloat()
+            setColor(fill)
+            setStroke(dp(1), Color.rgb(55, 59, 69))
+        }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
