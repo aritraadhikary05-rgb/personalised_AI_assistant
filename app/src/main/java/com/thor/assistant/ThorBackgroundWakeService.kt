@@ -87,8 +87,13 @@ class ThorBackgroundWakeService : Service() {
                                 waitingForCommand = false
                                 showCommandNotification(heard)
                             } else if (normalized.contains("hey thor") || normalized == "thor" || normalized.startsWith("thor ")) {
-                                val command = if (normalized.contains("hey thor")) heard.substringAfter("hey thor", "") else heard.substringAfter("thor", "")
-                                    .trim().trimStart(',', ':')
+                                val command = if (normalized.contains("hey thor")) {
+                                    Regex("\\bhey\\s+thor\\b", RegexOption.IGNORE_CASE)
+                                        .replaceFirst(heard, "")
+                                } else {
+                                    Regex("^\\s*thor\\b", RegexOption.IGNORE_CASE)
+                                        .replaceFirst(heard, "")
+                                }.trim().trimStart(',', ':')
                                 if (command.isNotBlank()) showCommandNotification(command)
                                 else waitingForCommand = true
                             }
