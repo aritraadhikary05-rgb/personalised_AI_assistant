@@ -349,7 +349,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
         }, matchWrap())
         homeBody.addView(ThorHudView(this), LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(176)
-        ).apply { setMargins(dp(4), dp(12), dp(4), dp(14) })
+        ).apply { setMargins(dp(4), dp(12), dp(4), dp(14)) })
         homeBody.addView(TextView(this).apply {
             text = "READY WHEN YOU ARE"
             textSize = 13f
