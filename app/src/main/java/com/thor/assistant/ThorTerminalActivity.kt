@@ -40,7 +40,9 @@ class ThorTerminalActivity : Activity() {
         Regex("""\b(pm|am|settings|svc)\s+(disable|enable|grant|revoke|put|delete|reset|force-stop|uninstall|install)\b""", RegexOption.IGNORE_CASE),
         Regex("""\brm\s+(-[^\s]*r[^\s]*f|-rf|-fr)\s+(/|\.\.)""", RegexOption.IGNORE_CASE),
         Regex("""(^|\s)(/system|/vendor|/product|/proc|/sys)(/|\s|$)"""),
-        Regex("""(^|/)\.\.(/|$)""")
+        Regex("""(^|/)\.\.(/|$)"""),
+        Regex("""(^|\\s)/"""),
+        Regex("""\\bln\\s+-s\\b""", RegexOption.IGNORE_CASE)
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -181,7 +183,7 @@ class ThorTerminalActivity : Activity() {
     private fun changeDirectory(path: String) {
         val target = if (path.isBlank() || path == "~") workspace else java.io.File(currentDirectory, path)
         val resolved = runCatching { target.canonicalFile }.getOrNull()
-        if (resolved == null || !resolved.path.startsWith(workspace.canonicalPath)) {
+        if (resolved == null || !(resolved == workspace.canonicalFile || resolved.path.startsWith(workspace.canonicalPath + java.io.File.separator))) {
             appendError("Directory is outside THOR's private workspace.")
         } else if (!resolved.isDirectory) {
             appendError("Directory not found: $path")
@@ -208,6 +210,8 @@ class ThorTerminalActivity : Activity() {
                         ProcessBuilder("/system/bin/sh", "-c", command)
                     }
                     val logFile = java.io.File(workspace, ".thor_last_output.txt")
+                    builder.environment()["HOME"] = currentDirectory.absolutePath
+                    builder.environment()["TMPDIR"] = currentDirectory.absolutePath
                     val process = builder.directory(currentDirectory).redirectErrorStream(true)
                         .redirectOutput(logFile).start()
                     val finished = process.waitFor(10, TimeUnit.SECONDS)
@@ -248,6 +252,9 @@ class ThorTerminalActivity : Activity() {
             try {
                 val provider = ThorAiProviderManager(this@ThorTerminalActivity)
                 val settings = provider.settings()
+                if (settings.provider == ThorAiProviderManager.Provider.LOCAL) {
+                    error("Select an online AI provider in THOR Settings to use AI coding in the terminal.")
+                }
                 val prompt = """
                     You are THOR's coding assistant for its built-in Android app terminal.
                     Produce one POSIX /system/bin/sh script for the user's task.
