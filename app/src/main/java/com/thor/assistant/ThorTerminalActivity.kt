@@ -42,7 +42,7 @@ class ThorTerminalActivity : Activity() {
         Regex("""\brm\s+(-[^\s]*r[^\s]*f|-rf|-fr)\s+(/|\.\.)""", RegexOption.IGNORE_CASE),
         Regex("""(^|\s)(/system|/vendor|/product|/proc|/sys)(/|\s|$)"""),
         Regex("""(^|/)\.\.(/|$)"""),
-        Regex("""(^|\\s)/"""),
+        Regex("""(^|\s)/"""),
         Regex("""\bln\s+-s\b""", RegexOption.IGNORE_CASE)
     )
 
