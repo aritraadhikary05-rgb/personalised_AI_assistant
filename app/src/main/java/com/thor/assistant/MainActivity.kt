@@ -587,7 +587,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             setPadding(dp(5), dp(5), dp(5), dp(5))
-            background = premiumBackground(Color.rgb(19, 23, 31), Color.rgb(48, 56, 69))
+            setBackground(premiumBackground(Color.rgb(19, 23, 31), Color.rgb(48, 56, 69)))
             clipToPadding = false
         }
         val navLabels = listOf("Home", "Chat", "Live", "Tools", "Shield", "Settings")
@@ -640,7 +640,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
                 gravity = Gravity.CENTER
                 isClickable = true
                 isFocusable = true
-                minHeight = dp(54)
+                setMinimumHeight(dp(54))
                 setPadding(dp(2), dp(5), dp(2), dp(5))
                 contentDescription = "$label tab"
                 setOnClickListener { showTab(index) }
