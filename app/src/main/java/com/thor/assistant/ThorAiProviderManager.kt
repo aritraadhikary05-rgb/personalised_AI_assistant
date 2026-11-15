@@ -28,6 +28,7 @@ class ThorAiProviderManager(private val context: Context) {
     enum class Provider(val title: String, val defaultModel: String, val defaultEndpoint: String) {
         GEMINI("Google Gemini (Firebase)", "gemini-3.8-flash", ""),
         GEMINI_API("Google Gemini (own API key)", "gemini-3.8-flash", "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"),
+        CLAUDE("Anthropic Claude (own API key)", "claude-sonnet-5-5", "https://api.anthropic.com/v1/messages"),
         OPENAI("OpenAI / ChatGPT API", "gpt-4o-mini", "https://api.openai.com/v1/chat/completions"),
         GROQ("Groq", "llama-3.3-70b-versatile", "https://api.groq.com/openai/v1/chat/completions"),
         OPENROUTER("OpenRouter", "meta-llama/llama-3.3-70b-instruct:free", "https://openrouter.ai/api/v1/chat/completions"),
@@ -103,6 +104,9 @@ class ThorAiProviderManager(private val context: Context) {
         if (config.provider == Provider.GEMINI_API) {
             return@withContext askGeminiApi(config, prompt, maxTokens)
         }
+        if (config.provider == Provider.CLAUDE) {
+            return@withContext askClaudeApi(config, prompt, maxTokens)
+        }
         val endpoint = config.endpoint.trim()
         require(endpoint.startsWith("https://", ignoreCase = true)) { "Provider endpoint must use HTTPS." }
         require(config.model.isNotBlank()) { "Enter a model name." }
@@ -163,6 +167,76 @@ class ThorAiProviderManager(private val context: Context) {
         }
     }
 
+
+
+    /**
+     * Anthropic's Messages API uses its own request and response envelope;
+     * it must not be sent through the OpenAI-compatible adapter.
+     */
+    private fun askClaudeApi(config: Settings, prompt: String, maxTokens: Int): String {
+        val endpoint = config.endpoint.trim()
+        require(endpoint.startsWith("https://", ignoreCase = true)) {
+            "Claude endpoint must use HTTPS."
+        }
+        val body = JSONObject()
+            .put("model", config.model)
+            .put("max_tokens", maxTokens.coerceIn(64, 512))
+            .put("messages", JSONArray().put(
+                JSONObject()
+                    .put("role", "user")
+                    .put("content", prompt.take(4000))
+            ))
+        val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 12_000
+            readTimeout = 30_000
+            doOutput = true
+            setRequestProperty("x-api-key", config.apiKey)
+            setRequestProperty("anthropic-version", "2023-06-01")
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("Accept", "application/json")
+        }
+        try {
+            connection.outputStream.use {
+                it.write(body.toString().toByteArray(Charsets.UTF_8))
+            }
+            val status = connection.responseCode
+            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+            val raw = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            if (status !in 200..299) {
+                val detail = runCatching {
+                    JSONObject(raw).optJSONObject("error")?.optString("message")
+                }.getOrNull().orEmpty().take(220).ifBlank { "HTTP $status" }
+                if (status == 429) {
+                    prefs.edit()
+                        .putLong("cooldown_until_${config.provider.name}", System.currentTimeMillis() + 60L * 60L * 1000L)
+                        .apply()
+                }
+                throw IllegalStateException(when (status) {
+                    401, 403 -> "Claude rejected the API key or permissions ($detail)."
+                    429 -> "Claude rate limit reached. A one-hour cooldown is now active. ($detail)"
+                    529 -> "Claude is temporarily overloaded. Please retry shortly. ($detail)"
+                    else -> "Claude API request failed: $detail"
+                })
+            }
+            val blocks = JSONObject(raw).optJSONArray("content")
+            val answer = buildString {
+                if (blocks != null) for (index in 0 until blocks.length()) {
+                    val block = blocks.optJSONObject(index) ?: continue
+                    if (block.optString("type") != "text") continue
+                    val value = block.optString("text")
+                    if (value.isNotBlank()) {
+                        if (isNotEmpty()) append('\\n')
+                        append(value)
+                    }
+                }
+            }
+            return answer.takeIf { it.isNotBlank() }
+                ?: error("Claude returned no text content.")
+        } finally {
+            connection.disconnect()
+        }
+    }
 
     /**
      * Gemini 3.8 Flash can occasionally be overloaded on the public API.
