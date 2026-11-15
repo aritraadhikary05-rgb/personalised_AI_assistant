@@ -108,7 +108,7 @@ class ThorTerminalActivity : Activity() {
             setTextColor(muted)
         })
         commandInput = EditText(this).apply {
-            singleLine = true
+            setSingleLine(true)
             textSize = 14f
             typeface = Typeface.MONOSPACE
             hint = "thor$  type a command..."
