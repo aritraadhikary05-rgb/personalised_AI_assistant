@@ -22,11 +22,23 @@ class ThorHudView(context: Context) : View(context) {
     private val density = resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var phase = 0f
+    private var burstProgress = 0f
+    private val burstAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 1250L
+        addUpdateListener { burstProgress = it.animatedValue as Float; invalidate() }
+    }
     private val animator = ValueAnimator.ofFloat(0f, 360f).apply {
         duration = 18000L
         repeatCount = ValueAnimator.INFINITE
         interpolator = LinearInterpolator()
         addUpdateListener { phase = it.animatedValue as Float; invalidate() }
+    }
+
+    /** Play a short blue-energy arrival burst without stopping the idle reactor loop. */
+    fun triggerIdentityBurst() {
+        burstAnimator.cancel()
+        burstProgress = 0f
+        burstAnimator.start()
     }
 
     init {
@@ -41,6 +53,7 @@ class ThorHudView(context: Context) : View(context) {
 
     override fun onDetachedFromWindow() {
         animator.cancel()
+        burstAnimator.cancel()
         super.onDetachedFromWindow()
     }
 
@@ -75,6 +88,29 @@ class ThorHudView(context: Context) : View(context) {
         )
         canvas.drawCircle(cx, cy, r * 1.16f, paint)
         paint.shader = null
+
+        // Identity recognition: expanding energy rings and short-lived radial flare.
+        if (burstProgress > 0f) {
+            val eased = 1f - (1f - burstProgress) * (1f - burstProgress)
+            val alpha = ((1f - burstProgress) * 220f).toInt().coerceIn(0, 220)
+            stroke(Color.argb(alpha, 95, 205, 255), (3.2f * density * (1f - burstProgress * 0.45f)))
+            canvas.drawCircle(cx, cy, r * (0.34f + eased * 0.88f), paint)
+            stroke(Color.argb((alpha * 0.55f).toInt(), 35, 145, 255), 1.5f * density)
+            canvas.drawCircle(cx, cy, r * (0.48f + eased * 0.72f), paint)
+            for (spark in 0 until 20) {
+                val angle = Math.toRadians((spark * 18f + phase * 0.15f).toDouble())
+                val inner = r * (0.72f + burstProgress * 0.12f)
+                val outer = inner + r * 0.12f * (1f - burstProgress)
+                stroke(Color.argb(alpha, 115, 220, 255), 1.8f * density)
+                canvas.drawLine(
+                    cx + cos(angle).toFloat() * inner,
+                    cy + sin(angle).toFloat() * inner,
+                    cx + cos(angle).toFloat() * outer,
+                    cy + sin(angle).toFloat() * outer,
+                    paint
+                )
+            }
+        }
 
         // Outer dark metallic segmented housing and illuminated blue windows.
         for (i in 0 until 16) {
