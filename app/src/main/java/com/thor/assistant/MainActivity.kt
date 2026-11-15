@@ -2950,6 +2950,10 @@ private fun launchIntent(
 
     override fun onResume() {
         super.onResume()
+        // Live Mode deliberately stops when THOR leaves the foreground. If Background
+        // Wake was enabled before Live Mode started, restore its foreground service
+        // when the user returns instead of leaving the saved setting silently inactive.
+        restartBackgroundWakeServiceIfEnabled()
     }
 
     override fun onDestroy() {
