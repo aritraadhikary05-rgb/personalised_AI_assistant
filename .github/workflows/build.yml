@@ -1,0 +1,106 @@
+
+name: Build THOR APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - thor-2.0-upgrade
+      - 'experiment/**'
+  pull_request:
+    branches:
+      - main
+      - 'experiment/**'
+      - 'feature/**'
+
+concurrency:
+  group: thor-android-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Run Android lint and unit tests
+        run: gradle --no-daemon :app:lintDebug :app:testDebugUnitTest
+
+      - name: Download bundled offline AI model
+        run: |
+          mkdir -p app/src/main/assets
+          curl -fL --retry 3 --retry-delay 5 \
+            "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/Qwen3-0.6B.litertlm?download=true" \
+            -o app/src/main/assets/Qwen3-0.6B.litertlm
+          test "$(stat -c%s app/src/main/assets/Qwen3-0.6B.litertlm)" -gt 100000000
+
+      - name: Download WeSpeaker model and frontend assets
+        run: |
+          mkdir -p app/src/main/assets
+          curl -fL --retry 3 --retry-delay 5 \
+            "https://huggingface.co/litert-community/Speaker-Diarization-LiteRT/resolve/main/wespeaker_emb_fp16.tflite?download=true" \
+            -o app/src/main/assets/wespeaker_emb_fp16.tflite
+          curl -fL --retry 3 --retry-delay 5 \
+            "https://raw.githubusercontent.com/geneing/LiteRT-Models-Pocket-TTS/main/diarization/app/src/main/assets/mel80_257.bin" \
+            -o app/src/main/assets/mel80_257.bin
+          curl -fL --retry 3 --retry-delay 5 \
+            "https://raw.githubusercontent.com/geneing/LiteRT-Models-Pocket-TTS/main/diarization/app/src/main/assets/hamming400.bin" \
+            -o app/src/main/assets/hamming400.bin
+          test "$(stat -c%s app/src/main/assets/wespeaker_emb_fp16.tflite)" -gt 10000000
+          test "$(stat -c%s app/src/main/assets/mel80_257.bin)" -eq 82240
+          test "$(stat -c%s app/src/main/assets/hamming400.bin)" -eq 1600
+
+      - name: Build debug APK with bundled offline AI and speaker model
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Validate APK artifact
+        run: |
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          unzip -t "$APK" >/dev/null
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "package: name='com.thor.assistant'"
+
+      - name: Upload APK
+        id: upload_apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: THOR-APK-DOWNLOAD
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish APK details
+        if: success()
+        run: |
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          echo "## THOR APK build" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Size: $(du -h "$APK" | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- SHA-256: $(sha256sum "$APK" | cut -d' ' -f1)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Artifact: THOR-APK-DOWNLOAD" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Download link: ${{ steps.upload_apk.outputs.artifact-url }}" >> "$GITHUB_STEP_SUMMARY"
+          
