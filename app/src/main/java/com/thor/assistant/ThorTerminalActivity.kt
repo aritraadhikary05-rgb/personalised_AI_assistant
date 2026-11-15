@@ -35,17 +35,6 @@ class ThorTerminalActivity : Activity() {
     private var busy = false
     private var approvalPending = false
 
-    private val blockedPatterns = listOf(
-        Regex("""(^|[;&|\s])su(\s|$)""", RegexOption.IGNORE_CASE),
-        Regex("""\b(sudo|doas|reboot|poweroff|halt|mkfs|dd|mount|umount|setprop|setenforce)\b""", RegexOption.IGNORE_CASE),
-        Regex("""\b(pm|am|settings|svc)\s+(disable|enable|grant|revoke|put|delete|reset|force-stop|uninstall|install)\b""", RegexOption.IGNORE_CASE),
-        Regex("""\brm\s+(-[^\s]*r[^\s]*f|-rf|-fr)\s+(/|\.\.)""", RegexOption.IGNORE_CASE),
-        Regex("""(^|\s)(/system|/vendor|/product|/proc|/sys)(/|\s|$)"""),
-        Regex("""(^|/)\.\.(/|$)"""),
-        Regex("""(^|\s)/"""),
-        Regex("""\bln\s+-s\b""", RegexOption.IGNORE_CASE)
-    )
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         workspace = java.io.File(filesDir, "thor_terminal").apply { mkdirs() }
@@ -458,7 +447,6 @@ class ThorTerminalActivity : Activity() {
         }
     }
 
-    private fun isBlocked(command: String): Boolean = blockedPatterns.any { it.containsMatchIn(command) }
 
     private fun append(value: String) {
         output.append(value)
