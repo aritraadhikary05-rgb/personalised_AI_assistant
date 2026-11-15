@@ -22,25 +22,25 @@ THOR is an experimental Android personal assistant project. The current validati
 
 ## Build and download
 
-GitHub Actions builds a debug APK for the active pull request targeting `experiment/boss-speaker-verification` and for supported workflow branches.
+GitHub Actions builds a debug APK for pull request #1 from `fix/navigation-polish-and-audit` into `main`, as well as supported release branches.
 
 1. Open the repository's **Actions** tab.
-2. Select the latest successful **Build THOR APK** run for the experimental branch.
-3. Download the `THOR-debug-apk` artifact and extract `app-debug.apk`.
+2. Select the latest successful **Build THOR APK** run for `fix/navigation-polish-and-audit`.
+3. Download the `THOR-APK-DOWNLOAD` artifact and extract `app-debug.apk`.
 4. Install it on an Android device after reviewing Android's installation prompt.
 
 The APK includes the offline model assets downloaded by CI and can therefore be very large. To keep startup responsive and avoid loading a large model into RAM unnecessarily, THOR loads Offline AI only when you tap its button or explicitly request an offline answer.
 
 ## THOR Live Mode setup
 
-THOR Live uses Google's bidirectional Gemini Live API rather than the normal text-chat request path. It streams microphone PCM audio directly to Gemini over a WebSocket and plays native model audio; the selected THOR voice style maps to a supported Gemini prebuilt voice. Live captions are transient UI text only. THOR does not append Live turns to the chat screen or write them to the app's chat/history storage. Ending the session closes the socket, stops microphone capture and playback, and clears the latest caption.
+THOR Live uses Google's bidirectional Gemini Live API. It streams microphone PCM audio to Gemini over a WebSocket and plays native model audio. The current client uses the `gemini-3.8-live` model and the Gemini API key saved on the device.
 
-Live Mode uses the Cloudflare Worker URL already configured in **Master Mode Setup**. It also requires:
-1. Enable **Anonymous** sign-in in Firebase Authentication (or sign in through an existing THOR Firebase account).
-2. In Cloudflare Worker secrets, add `GEMINI_API_KEY` containing a Google AI Studio API key with Gemini Live API access. Never put this key in the APK, GitHub, or chat.
-3. Apply the updated D1 schema from `cloudflare/master-mode/schema.sql` using `npm run db:migrate:remote`, then deploy the updated Worker using `npm run deploy`.
-4. Keep the Firebase Web API key configured as `FIREBASE_WEB_API_KEY` Worker secret. The Worker authenticates Firebase ID tokens and limits token issuance to 12 requests per account per hour. Each issued Live token is single-use and short-lived.
-5. Open THOR's **LIVE** tab and start a session. The app uses the Worker URL configured on that device.
+To enable Live Mode:
+1. Open **Settings → AI Provider**.
+2. Choose **Google Gemini (own API key)** and save a Google AI Studio API key with Gemini Live API access.
+3. Open the **LIVE** tab and start a session.
+
+Live Mode uses the same saved direct Gemini API key as the direct Gemini provider; it does not require a second Live-specific key or the Cloudflare Worker URL. The Cloudflare Worker and D1 database are used by the separate Remote Master Mode feature.
 
 Live Mode uses network data continuously while active and may incur Gemini API usage charges or quota limits. Use Wi-Fi or review the provider's pricing/quota before long sessions. Headphones are recommended to reduce speaker-to-microphone echo. The app stops the live microphone session when it leaves the foreground.
 
@@ -68,4 +68,4 @@ The Android Firebase configuration file identifies project `thor-ai-2791b` (proj
 project consistent with that project. Never commit service-account JSON, private keys, passwords,
 or App Check debug tokens.
 
-**Terminal safety:** THOR Terminal is an app-private workspace, not a root shell or unrestricted Android shell. It supports a small set of file and information commands; AI-generated scripts are interpreted only through that restricted command set and cannot execute arbitrary shell programs.
+**Terminal safety:** THOR Terminal is an app-private workspace, not a root shell or unrestricted Android shell. It supports a small set of file and information commands. THOR AI generates command plans for that interpreter; it does not execute arbitrary shell programs.
