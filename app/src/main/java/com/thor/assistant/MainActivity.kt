@@ -294,16 +294,16 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun buildScreen() {
-        val background = Color.rgb(9, 11, 16)
-        val panel = Color.rgb(22, 27, 36)
-        val blue = Color.rgb(105, 195, 255)
-        val muted = Color.rgb(153, 164, 181)
+        val background = Color.rgb(11, 13, 18)
+        val panel = Color.rgb(25, 28, 35)
+        val blue = Color.rgb(10, 132, 255)
+        val muted = Color.rgb(152, 156, 165)
         window.statusBarColor = background
         window.navigationBarColor = background
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(16), dp(14), dp(8))
+            setPadding(dp(18), dp(12), dp(18), dp(8))
             setBackgroundColor(background)
         }
 
@@ -314,7 +314,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
 
         fun page(): LinearLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(8), dp(8), dp(8), dp(10))
+            setPadding(dp(6), dp(8), dp(6), dp(12))
             setBackgroundColor(background)
         }
 
@@ -327,16 +327,12 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
         val homeScroll = scrollPage(homeBody)
         val homeTitle = TextView(this).apply {
             text = "THOR"
-            textSize = 32f
+            textSize = 30f
             gravity = Gravity.CENTER
             setTextColor(blue)
-            letterSpacing = 0.22f
+            letterSpacing = 0.08f
         }
         homeBody.addView(homeTitle, matchWrap())
-        // Persistent creator emblem: visible on the Home screen, not only during the splash animation.
-        homeBody.addView(creatorEmblemView(), LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { setMargins(dp(8), dp(6), dp(8), dp(12)) })
         val homeTitleAnimator = ObjectAnimator.ofFloat(homeTitle, "alpha", 0.72f, 1f).apply {
             duration = 1800L
             repeatCount = ValueAnimator.INFINITE
@@ -352,8 +348,8 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
             letterSpacing = 0.12f
         }, matchWrap())
         homeBody.addView(ThorHudView(this), LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, (220 * resources.displayMetrics.density).toInt()
-        ).apply { setMargins(0, 18, 0, 18) })
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(176)
+        ).apply { setMargins(dp(4), dp(12), dp(4), dp(14) })
         homeBody.addView(TextView(this).apply {
             text = "READY WHEN YOU ARE"
             textSize = 13f
@@ -598,11 +594,11 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             setPadding(dp(5), dp(5), dp(5), dp(5))
-            setBackground(premiumBackground(Color.rgb(19, 23, 31), Color.rgb(48, 56, 69)))
+            setBackground(premiumBackground(Color.rgb(22, 24, 30), Color.rgb(48, 51, 60)))
             clipToPadding = false
         }
         val navLabels = listOf("Home", "Chat", "Live", "Tools", "Shield", "Settings")
-        val navSymbols = listOf("⌂", "▤", "◉", "▦", "◇", "⚙")
+        val navSymbols = listOf("⌂", "◌", "◉", "⌘", "◇", "⚙")
         val navButtons = mutableListOf<LinearLayout>()
         val navIcons = mutableListOf<TextView>()
         val navTexts = mutableListOf<TextView>()
@@ -617,8 +613,8 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
                 val tint = if (selected) blue else muted
                 button.isSelected = selected
                 button.setBackground(premiumBackground(
-                    if (selected) Color.rgb(15, 43, 68) else Color.TRANSPARENT,
-                    if (selected) Color.rgb(38, 112, 158) else Color.TRANSPARENT
+                    if (selected) Color.rgb(24, 48, 78) else Color.TRANSPARENT,
+                    if (selected) Color.rgb(10, 132, 255) else Color.TRANSPARENT
                 ))
                 navIcons[buttonIndex].setTextColor(tint)
                 navTexts[buttonIndex].setTextColor(tint)
@@ -714,15 +710,6 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
             (300 * resources.displayMetrics.density).toInt()
         ).apply { setMargins(0, 14, 0, 10) })
 
-        // Keep the premium creator emblem visible throughout the Arc Reactor / Live page.
-        body.addView(creatorEmblemView().apply {
-            textSize = 9.5f
-            setPadding(dp(14), dp(9), dp(14), dp(9))
-            elevation = dp(4).toFloat()
-        }, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { setMargins(dp(12), dp(2), dp(12), dp(12)) })
 
         val status = TextView(this).apply {
             text = "READY FOR A LIVE CONVERSATION"
@@ -986,7 +973,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
      * interface remains smooth and compatible with Android 10 / lower-memory devices.
      */
     private fun premiumBackground(fill: Int, stroke: Int = Color.rgb(38, 88, 124)): android.graphics.drawable.Drawable {
-        val radius = dp(22).toFloat()
+        val radius = dp(18).toFloat()
         fun glassShape(color: Int) = android.graphics.drawable.GradientDrawable().apply {
             shape = android.graphics.drawable.GradientDrawable.RECTANGLE
             cornerRadius = radius
@@ -1036,14 +1023,14 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
 
     private fun makeButton(label: String) = Button(this).apply {
         text = label
-        textSize = 12f
+        textSize = 13f
         isAllCaps = false
-        setTextColor(Color.rgb(232, 245, 255))
+        setTextColor(Color.rgb(245, 246, 250))
         typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
-        letterSpacing = 0.025f
-        minHeight = dp(50)
+        letterSpacing = 0.005f
+        minHeight = dp(52)
         setPadding(dp(17), dp(11), dp(17), dp(11))
-        background = premiumBackground(Color.rgb(24, 29, 38), Color.rgb(58, 68, 84))
+        background = premiumBackground(Color.rgb(27, 29, 36), Color.rgb(58, 61, 70))
         elevation = dp(1).toFloat()
     }
 
