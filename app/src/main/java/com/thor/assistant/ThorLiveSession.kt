@@ -56,7 +56,7 @@ class ThorLiveSession(
         private const val INPUT_RATE = 16_000
         private const val OUTPUT_RATE = 24_000
         private const val FRAME_BYTES = 640 // 20 ms at 16 kHz, mono PCM16
-        private const val LIVE_MODEL = "models/gemini-3.1-flash-live-preview"
+        private const val LIVE_MODEL = "models/gemini-3.8-live"
     }
 
     private val appContext = context.applicationContext
