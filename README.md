@@ -2,8 +2,7 @@
 
 **Android compatibility target:** Android 10 (API 29) and newer. The APK's minimum SDK is set to API 29; device-specific capabilities such as microphone foreground services, notifications, speech recognition, and accessibility navigation still depend on Android version, OEM restrictions, permissions, and installed system services.
 
-THOR is an experimental Android personal assistant project. The active development branch is
-`feature/thor-live-mode`; its draft pull request targets `experiment/boss-speaker-verification`. Keep it separate from the main branch while features are being validated.
+THOR is an experimental Android personal assistant project. The current validation work is maintained on `fix/navigation-polish-and-audit` and reviewed through pull request #1. Keep it separate from `main` until the build and device checks are complete.
 
 ## Current project features
 
@@ -68,3 +67,5 @@ The Android Firebase configuration file identifies project `thor-ai-2791b` (proj
 `418315674236`). Keep the Worker `FIREBASE_PROJECT_ID`, Firebase Web API key, and service-account
 project consistent with that project. Never commit service-account JSON, private keys, passwords,
 or App Check debug tokens.
+
+**Terminal safety:** THOR Terminal is an app-private workspace, not a root shell or unrestricted Android shell. It supports a small set of file and information commands; AI-generated scripts are interpreted only through that restricted command set and cannot execute arbitrary shell programs.
