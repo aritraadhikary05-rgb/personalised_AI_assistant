@@ -84,6 +84,9 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
     private lateinit var bossProfile: ThorBossProfile
     private var awaitingIdentityName = false
     private var masterVerifiedThisSession = false
+    private var openTerminalAfterMasterVerification = false
+    private var homeReactor: ThorHudView? = null
+    private var homeContentFrame: android.widget.FrameLayout? = null
     private val masterAuthStateListener = FirebaseAuth.AuthStateListener { auth ->
         val user = auth.currentUser
         if (user == null) {
@@ -328,6 +331,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
         }
 
         val contentFrame = android.widget.FrameLayout(this)
+        homeContentFrame = contentFrame
         root.addView(contentFrame, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
         ))
@@ -367,7 +371,8 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
             setTextColor(muted)
             letterSpacing = 0.12f
         }, matchWrap())
-        homeBody.addView(ThorHudView(this), LinearLayout.LayoutParams(
+        homeReactor = ThorHudView(this)
+        homeBody.addView(homeReactor, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(176)
         ).apply { setMargins(dp(4), dp(12), dp(4), dp(14)) })
         homeBody.addView(TextView(this).apply {
@@ -1112,18 +1117,33 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
 
     private fun handleIdentityName(identity: String) {
         val normalized = identity.trim().lowercase(Locale.ROOT).replace(Regex("\\s+"), " ")
-        val isAritra = normalized == "aritra" || normalized == "aritra adhikary"
-        val isDeep = normalized == "deep" || normalized == "deep dikshit"
+        val identityKey = normalized.replace(Regex("[^a-z0-9]"), "")
+        // Speech recognition may render the spoken name phonetically. Keep
+        // these aliases deliberately narrow to avoid matching ordinary words.
+        val isAritra = identityKey in setOf(
+            "aritra", "aritraadhikary", "aritraadhikari",
+            "orithroikari", "orithroikary", "orithraikari"
+        )
 
-        if (isAritra || isDeep) {
-            val title = if (isAritra) "Lord Aritra" else "Lord Deep"
-            val greeting = "Welcome, $title. THOR recognizes you as one of its creators. Your ideas and effort are valued; I’ll give you honest, useful support."
+        if (isAritra) {
+            openTerminalAfterMasterVerification = true
+            playBossArrival()
+            val title = "Lord Aritra"
+            val time = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())
+            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+            val timeGreeting = when (hour) {
+                in 5..11 -> "Good morning"
+                in 12..16 -> "Good afternoon"
+                in 17..20 -> "Good evening"
+                else -> "Good evening"
+            }
+            val greeting = "$timeGreeting, $title. It is $time. THOR is online and ready to assist you. Master Mode will open after secure verification."
             addMessage("THOR", greeting)
             speak(greeting)
 
-            // A spoken name only opens the existing secure verification flow.
-            // Master privileges are granted only after Firebase claims and the
-            // Cloudflare approval session have both been validated.
+            // A spoken name triggers the visual arrival only. Master privileges
+            // and the terminal are available only after Firebase + Worker session
+            // verification or the existing Device A approval flow succeeds.
             val user = FirebaseAuth.getInstance().currentUser
             if (user == null) {
                 showMasterModeSetupDialog()
@@ -1143,6 +1163,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
                                 }
                                 addMessage("THOR", message)
                                 speak(message)
+                                if (active == true) openTerminalIfRequested()
                                 if (active == false) FirebaseAuth.getInstance().signOut()
                             }
                         } else {
@@ -1154,10 +1175,36 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
                     }
             }
         } else {
-            val message = "Hello, $identity. I haven't verified you as a THOR creator or Master."
+            val message = "Hello, $identity. I haven't verified you as THOR's configured owner."
             addMessage("THOR", message)
             speak(message)
         }
+    }
+
+    private fun playBossArrival() {
+        homeReactor?.triggerIdentityBurst()
+        val host = homeContentFrame ?: return
+        val flash = android.view.View(this).apply {
+            setBackgroundColor(Color.rgb(35, 145, 255))
+            alpha = 0f
+            isClickable = false
+            isFocusable = false
+        }
+        host.addView(flash, android.widget.FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        ))
+        flash.animate().alpha(0.34f).setDuration(95L).withEndAction {
+            flash.animate().alpha(0f).setStartDelay(45L).setDuration(520L).withEndAction {
+                host.removeView(flash)
+            }.start()
+        }.start()
+    }
+
+    private fun openTerminalIfRequested() {
+        if (!openTerminalAfterMasterVerification || !masterVerifiedThisSession || isFinishing) return
+        openTerminalAfterMasterVerification = false
+        startActivity(Intent(this, ThorTerminalActivity::class.java))
     }
 
     private fun creatorLoreReply(): String =
@@ -1310,6 +1357,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
                                         masterVerifiedThisSession = true
                                         addMessage("THOR", "Fingerprint approval verified. Master Mode is active on this device.")
                                         speak("Master Mode unlocked.")
+                                        openTerminalIfRequested()
                                     }
                                     .addOnFailureListener { authError ->
                                         masterApprovalClient.clearSessionId()
