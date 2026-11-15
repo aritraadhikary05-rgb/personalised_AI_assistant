@@ -43,7 +43,7 @@ class ThorTerminalActivity : Activity() {
         Regex("""(^|\s)(/system|/vendor|/product|/proc|/sys)(/|\s|$)"""),
         Regex("""(^|/)\.\.(/|$)"""),
         Regex("""(^|\\s)/"""),
-        Regex("""\\bln\\s+-s\\b""", RegexOption.IGNORE_CASE)
+        Regex("""\bln\s+-s\b""", RegexOption.IGNORE_CASE)
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
