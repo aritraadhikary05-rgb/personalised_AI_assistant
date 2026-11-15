@@ -2444,8 +2444,13 @@ lower.startsWith("অ্যালার্ম ") -> {
             addMessage("THOR", "Connecting to ${selectedProvider.title}...")
             mainScope.launch {
                 try {
-                    val answer = providerManager.ask("$styleInstruction\n$languageInstruction\n$memoryContext\nUser: $compactPrompt")
-                    addMessage("THOR", answer)
+                    runOnUiThread { chat.append("THOR  ›  ") }
+                    val answer = providerManager.askStreaming(
+                        "$styleInstruction\n$languageInstruction\n$memoryContext\nUser: $compactPrompt"
+                    ) { chunk ->
+                        runOnUiThread { chat.append(chunk) }
+                    }
+                    runOnUiThread { chat.append("\n\n") }
                     speak(answer)
                 } catch (error: CancellationException) {
                     throw error
