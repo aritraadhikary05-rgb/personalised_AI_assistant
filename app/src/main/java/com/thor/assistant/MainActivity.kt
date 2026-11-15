@@ -307,6 +307,26 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
             setBackgroundColor(background)
         }
 
+        // Android 15 enforces edge-to-edge for apps targeting API 35. Keep the
+        // content and bottom navigation clear of system bars and display cutouts.
+        if (Build.VERSION.SDK_INT >= 35) {
+            window.statusBarColor = Color.TRANSPARENT
+            window.navigationBarColor = Color.TRANSPARENT
+            root.setOnApplyWindowInsetsListener { view, insets ->
+                val systemBars = insets.getInsets(
+                    android.view.WindowInsets.Type.systemBars() or
+                        android.view.WindowInsets.Type.displayCutout()
+                )
+                view.setPadding(
+                    dp(18) + systemBars.left,
+                    dp(12) + systemBars.top,
+                    dp(18) + systemBars.right,
+                    dp(8) + systemBars.bottom
+                )
+                insets
+            }
+        }
+
         val contentFrame = android.widget.FrameLayout(this)
         root.addView(contentFrame, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
