@@ -166,7 +166,7 @@ class ThorTerminalActivity : Activity() {
             }
             command.equals("help", true) -> {
                 append("Commands: help, pwd, ls, cd, mkdir, touch, cat, echo, date, whoami, clear")
-                append("Android shell commands may also work, subject to THOR safety checks.")
+                append("Only THOR's restricted app-private commands are supported; arbitrary Android shell commands are disabled.")
                 append("AI coding: type ask <what you want built> or use ASK THOR AI.")
                 appendPrompt()
             }
@@ -195,37 +195,39 @@ class ThorTerminalActivity : Activity() {
         appendPrompt()
     }
 
+    /**
+     * THOR's terminal intentionally uses a small, app-private command interpreter
+     * instead of executing arbitrary shell code with the app's Android UID.
+     * This prevents generated scripts from accessing app credentials, network
+     * sockets, Android system commands, or files outside the private workspace.
+     */
     private fun executeCommand(command: String, scriptFile: java.io.File? = null) {
-        if (isBlocked(command)) {
-            appendError("Blocked by THOR safety guard. Root access and protected Android system modifications are unavailable.")
-            appendPrompt()
-            return
-        }
         setBusy(true)
         scope.launch {
             try {
                 val result = withContext(Dispatchers.IO) {
-                    val builder = if (scriptFile != null) {
-                        ProcessBuilder("/system/bin/sh", scriptFile.absolutePath)
-                    } else {
-                        ProcessBuilder("/system/bin/sh", "-c", command)
+                    val commands = if (scriptFile != null) {
+                        require(scriptFile.canonicalFile.parentFile == workspace.canonicalFile) {
+                            "Script is outside THOR's private workspace."
+                        }
+                        require(scriptFile.length() <= 32_000L) { "Script is too large." }
+                        scriptFile.readLines().also {
+                            require(it.size <= 100) { "Script exceeds the 100-line limit." }
+                        }
+                    } else listOf(command)
+
+                    val outputLines = mutableListOf<String>()
+                    for (line in commands) {
+                        val trimmed = line.trim()
+                        if (trimmed.isBlank() || trimmed.startsWith("#")) continue
+                        val resultLine = runRestrictedCommand(trimmed)
+                        if (resultLine.startsWith("[ERROR]")) {
+                            outputLines.add(resultLine)
+                            break
+                        }
+                        if (resultLine.isNotBlank()) outputLines.add(resultLine)
                     }
-                    val logFile = java.io.File(workspace, ".thor_last_output.txt")
-                    builder.environment()["HOME"] = currentDirectory.absolutePath
-                    builder.environment()["TMPDIR"] = currentDirectory.absolutePath
-                    val process = builder.directory(currentDirectory).redirectErrorStream(true)
-                        .redirectOutput(logFile).start()
-                    val finished = process.waitFor(10, TimeUnit.SECONDS)
-                    if (!finished) {
-                        process.destroyForcibly()
-                        "Command timed out after 10 seconds."
-                    } else {
-                        val text = logFile.takeIf { it.exists() }?.readText()?.take(24000).orEmpty()
-                        logFile.delete()
-                        val status = process.exitValue()
-                        (text.ifBlank { if (status == 0) "Completed (exit 0)." else "No output." }) +
-                            if (status == 0) "" else "\nExit code: $status"
-                    }
+                    outputLines.joinToString("\n").ifBlank { "Completed." }
                 }
                 append(result)
             } catch (error: CancellationException) {
@@ -236,6 +238,132 @@ class ThorTerminalActivity : Activity() {
                 setBusy(false)
                 appendPrompt()
             }
+        }
+    }
+
+    private fun tokenizeRestrictedCommand(command: String): List<String> {
+        require(command.length <= 2_000) { "Command is too long." }
+        require(command.none { it in ";|&$()<>\u0060\\\n\r" }) {
+            "Shell operators, substitutions, escapes, and command chaining are not supported."
+        }
+        val tokens = mutableListOf<String>()
+        val token = StringBuilder()
+        var quote: Char? = null
+        var tokenStarted = false
+        for (character in command) {
+            when {
+                quote != null && character == quote -> quote = null
+                quote == null && (character == '\'' || character == '"') -> {
+                    quote = character
+                    tokenStarted = true
+                }
+                quote == null && character.isWhitespace() -> {
+                    if (tokenStarted) {
+                        tokens.add(token.toString())
+                        token.setLength(0)
+                        tokenStarted = false
+                    }
+                }
+                else -> {
+                    token.append(character)
+                    tokenStarted = true
+                }
+            }
+        }
+        require(quote == null) { "Unclosed quote." }
+        if (tokenStarted) tokens.add(token.toString())
+        return tokens
+    }
+
+    private fun safeWorkspaceFile(path: String): java.io.File {
+        require(path.isNotBlank()) { "A file or directory name is required." }
+        val base = currentDirectory.canonicalFile
+        val resolved = java.io.File(base, path).canonicalFile
+        require(
+            resolved == workspace.canonicalFile ||
+                resolved.path.startsWith(workspace.canonicalPath + java.io.File.separator)
+        ) { "Path is outside THOR's private workspace." }
+        return resolved
+    }
+
+    private fun runRestrictedCommand(command: String): String {
+        return try {
+            val args = tokenizeRestrictedCommand(command)
+            if (args.isEmpty()) return ""
+            when (args[0].lowercase(java.util.Locale.ROOT)) {
+                "help" -> "Commands: help, pwd, ls [path], mkdir <name>, touch <file>, write <file> <text>, cat <file>, date, whoami, echo <text>, clear"
+                "pwd" -> {
+                    require(args.size == 1) { "Usage: pwd" }
+                    currentDirectory.canonicalPath
+                }
+                "whoami" -> {
+                    require(args.size == 1) { "Usage: whoami" }
+                    "THOR app sandbox (UID ${android.os.Process.myUid()})"
+                }
+                "date" -> {
+                    require(args.size == 1) { "Usage: date" }
+                    java.text.DateFormat.getDateTimeInstance().format(java.util.Date())
+                }
+                "echo" -> args.drop(1).joinToString(" ")
+                "ls" -> {
+                    require(args.size <= 2) { "Usage: ls [path]" }
+                    val directory = safeWorkspaceFile(args.getOrNull(1) ?: ".")
+                    require(directory.isDirectory) { "Not a directory: ${args.getOrNull(1) ?: "."}" }
+                    directory.listFiles()?.sortedBy { it.name.lowercase(java.util.Locale.ROOT) }
+                        ?.joinToString("\n") { file ->
+                            (if (file.isDirectory) "[DIR] " else "      ") + file.name
+                        }.orEmpty().ifBlank { "(empty)" }
+                }
+                "mkdir" -> {
+                    require(args.size == 2) { "Usage: mkdir <name>" }
+                    val directory = safeWorkspaceFile(args[1])
+                    require(directory.mkdirs() || directory.isDirectory) { "Could not create directory." }
+                    "Created directory: ${directory.name}"
+                }
+                "touch" -> {
+                    require(args.size == 2) { "Usage: touch <file>" }
+                    val file = safeWorkspaceFile(args[1])
+                    require(file.parentFile?.isDirectory == true) { "Parent directory does not exist." }
+                    if (!file.exists()) require(file.createNewFile()) { "Could not create file." }
+                    else file.setLastModified(System.currentTimeMillis())
+                    "Updated file: ${file.name}"
+                }
+                "write" -> {
+                    require(args.size >= 3) { "Usage: write <file> <text>" }
+                    val file = safeWorkspaceFile(args[1])
+                    require(file.parentFile?.isDirectory == true) { "Parent directory does not exist." }
+                    val content = args.drop(2).joinToString(" ")
+                    require(content.length <= 16_000) { "Text is too long (maximum 16 KB)." }
+                    file.writeText(content, Charsets.UTF_8)
+                    "Wrote ${content.length} characters to ${file.name}"
+                }
+                "cat" -> {
+                    require(args.size == 2) { "Usage: cat <file>" }
+                    val file = safeWorkspaceFile(args[1])
+                    require(file.isFile) { "File not found: ${file.name}" }
+                    require(file.length() <= 64_000L) { "File is too large to display (maximum 64 KB)." }
+                    file.readText(Charsets.UTF_8)
+                }
+                "clear", "cls" -> {
+                    require(args.size == 1) { "Usage: clear" }
+                    output.text = ""
+                    "Terminal cleared."
+                }
+                else -> error("Unsupported command '${args[0]}'. THOR only runs app-private file and information commands.")
+            }
+        } catch (error: Exception) {
+            "[ERROR] ${error.message ?: error.javaClass.simpleName}"
+        }
+    }
+
+    private fun isBlocked(script: String): Boolean {
+        val lines = script.lines().filter { it.isNotBlank() && !it.trimStart().startsWith("#") }
+        if (lines.isEmpty() || lines.size > 100) return true
+        return lines.any { line ->
+            val args = runCatching { tokenizeRestrictedCommand(line) }.getOrNull()
+            args.isNullOrEmpty() || args[0].lowercase(java.util.Locale.ROOT) !in setOf(
+                "help", "pwd", "whoami", "date", "echo", "ls", "mkdir", "touch", "write", "cat", "clear", "cls"
+            )
         }
     }
 
@@ -286,7 +414,7 @@ class ThorTerminalActivity : Activity() {
                 } else if (isBlocked(code)) {
                     append("THOR AI EXPLANATION:")
                     append(answer.substringBefore(fence).take(1800))
-                    appendError("The generated script contains a restricted command and was not executed.")
+                    appendError("The script uses commands outside THOR's restricted app-private command set. It was not executed.")
                 } else {
                     append("THOR AI PLAN:")
                     append(answer.substringBefore(fence).take(1800).ifBlank { "Script prepared for review." })
