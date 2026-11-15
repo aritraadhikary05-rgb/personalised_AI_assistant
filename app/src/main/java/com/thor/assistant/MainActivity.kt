@@ -350,48 +350,169 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
 
         val homeBody = page()
         val homeScroll = scrollPage(homeBody)
+
+        // A restrained, editorial wordmark replaces the old pulsing title.
+        // Keep the home identity typographic and calm, with a small glass status chip.
+        val homeHeader = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(2), dp(4), dp(2), dp(2))
+        }
+        val homeBrand = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
         val homeTitle = TextView(this).apply {
             text = "THOR"
-            textSize = 30f
+            textSize = 38f
+            gravity = Gravity.START
+            includeFontPadding = false
+            setTextColor(Color.rgb(246, 248, 252))
+            letterSpacing = 0.19f
+            typeface = android.graphics.Typeface.create(
+                "sans-serif-medium",
+                android.graphics.Typeface.NORMAL
+            )
+            setShadowLayer(dp(12).toFloat(), 0f, 0f, Color.argb(34, 76, 170, 255))
+        }
+        homeBrand.addView(homeTitle, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
+        val homeSubtitle = TextView(this).apply {
+            text = "PERSONAL INTELLIGENCE"
+            textSize = 9.5f
+            includeFontPadding = false
+            setTextColor(Color.rgb(139, 151, 169))
+            letterSpacing = 0.19f
+            typeface = android.graphics.Typeface.create(
+                "sans-serif-medium",
+                android.graphics.Typeface.NORMAL
+            )
+        }
+        homeBrand.addView(homeSubtitle, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(6) })
+        homeHeader.addView(homeBrand, LinearLayout.LayoutParams(0,
+            ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+
+        val identityChip = TextView(this).apply {
+            text = "AI ASSISTANT"
+            textSize = 9f
+            includeFontPadding = false
             gravity = Gravity.CENTER
-            setTextColor(blue)
             letterSpacing = 0.08f
+            typeface = android.graphics.Typeface.create(
+                "sans-serif-medium",
+                android.graphics.Typeface.NORMAL
+            )
+            setTextColor(Color.rgb(174, 205, 239))
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+            background = premiumBackground(
+                Color.rgb(18, 29, 44),
+                Color.rgb(49, 77, 110)
+            )
         }
-        homeBody.addView(homeTitle, matchWrap())
-        val homeTitleAnimator = ObjectAnimator.ofFloat(homeTitle, "alpha", 0.72f, 1f).apply {
-            duration = 1800L
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
+        homeHeader.addView(identityChip, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { leftMargin = dp(8) })
+        homeBody.addView(homeHeader, matchWrap())
+
+        val homeDivider = android.view.View(this).apply {
+            setBackgroundColor(Color.rgb(39, 45, 56))
         }
-        repeatingUiAnimators += homeTitleAnimator
-        homeTitleAnimator.start()
+        homeBody.addView(homeDivider, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(1)
+        ).apply {
+            topMargin = dp(14)
+            bottomMargin = dp(18)
+        })
+
+        val homeGreeting = TextView(this).apply {
+            text = "What can I help you with?"
+            textSize = 23f
+            includeFontPadding = false
+            setTextColor(Color.rgb(241, 244, 249))
+            typeface = android.graphics.Typeface.create(
+                "sans-serif-medium",
+                android.graphics.Typeface.NORMAL
+            )
+        }
+        homeBody.addView(homeGreeting, matchWrap())
         homeBody.addView(TextView(this).apply {
-            text = "YOUR PERSONAL AI ASSISTANT"
-            textSize = 11f
-            gravity = Gravity.CENTER
-            setTextColor(muted)
-            letterSpacing = 0.12f
-        }, matchWrap())
-        homeReactor = ThorHudView(this)
-        homeBody.addView(homeReactor, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(176)
-        ).apply { setMargins(dp(4), dp(12), dp(4), dp(14)) })
-        homeBody.addView(TextView(this).apply {
-            text = "READY WHEN YOU ARE"
+            text = "Speak naturally. Your assistant is ready."
             textSize = 13f
-            gravity = Gravity.CENTER
-            setTextColor(blue)
-            letterSpacing = 0.1f
+            includeFontPadding = false
+            setTextColor(Color.rgb(139, 148, 163))
+            setPadding(0, dp(7), 0, 0)
         }, matchWrap())
-        val homeMic = makeButton("TAP TO SPEAK")
+
+        // The existing reactor remains the visual centre, presented on a quiet glass surface.
+        val reactorCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            background = premiumBackground(
+                Color.rgb(15, 21, 31),
+                Color.rgb(43, 59, 79)
+            )
+            elevation = dp(2).toFloat()
+        }
+        homeReactor = ThorHudView(this)
+        reactorCard.addView(homeReactor, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(176)
+        ))
+        homeBody.addView(reactorCard, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            setMargins(dp(2), dp(16), dp(2), dp(16))
+        })
+
+        val readyLabel = TextView(this).apply {
+            text = "READY WHEN YOU ARE"
+            textSize = 10f
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setTextColor(Color.rgb(133, 174, 220))
+            letterSpacing = 0.16f
+            typeface = android.graphics.Typeface.create(
+                "sans-serif-medium",
+                android.graphics.Typeface.NORMAL
+            )
+            setPadding(0, dp(1), 0, dp(10))
+        }
+        homeBody.addView(readyLabel, matchWrap())
+
+        val homeMic = makeButton("Start speaking")
         homeMic.setTextColor(Color.WHITE)
+        homeMic.textSize = 15f
+        homeMic.minHeight = dp(58)
+        homeMic.background = android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+            intArrayOf(Color.rgb(16, 116, 230), Color.rgb(39, 145, 255))
+        ).apply {
+            cornerRadius = dp(18).toFloat()
+            setStroke(dp(1), Color.rgb(79, 166, 255))
+        }
+        homeMic.elevation = dp(3).toFloat()
         homeMic.setOnClickListener { startVoiceInput() }
-        homeBody.addView(homeMic, matchWrap())
+        homeBody.addView(homeMic, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { setMargins(dp(2), 0, dp(2), dp(9)) })
+
         val homeWake = makeButton("WAKE WORD: OFF")
+        homeWake.textSize = 12f
+        homeWake.minHeight = dp(48)
+        homeWake.setTextColor(Color.rgb(207, 216, 229))
+        homeWake.background = premiumBackground(
+            Color.rgb(22, 26, 34),
+            Color.rgb(54, 63, 77)
+        )
         homeWake.setOnClickListener { toggleWakeWord(homeWake) }
         wakeButton = homeWake
         wakeButtons += homeWake
-        homeBody.addView(homeWake, matchWrap())
+        homeBody.addView(homeWake, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { setMargins(dp(2), 0, dp(2), dp(4)) })
         contentFrame.addView(homeScroll, android.widget.FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         ))
