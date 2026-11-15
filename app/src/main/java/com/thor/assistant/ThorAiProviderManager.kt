@@ -338,7 +338,7 @@ class ThorAiProviderManager(private val context: Context) {
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("Accept", "application/json")
             if (config.provider == Provider.OPENROUTER) {
-                setRequestProperty("HTTP-Referer", "https://github.com/deepdikshit07-hub/thor-android")
+                setRequestProperty("HTTP-Referer", "https://github.com/aritraadhikary05-rgb/personalised_AI_assistant")
                 setRequestProperty("X-Title", "THOR Android Assistant")
             }
         }
