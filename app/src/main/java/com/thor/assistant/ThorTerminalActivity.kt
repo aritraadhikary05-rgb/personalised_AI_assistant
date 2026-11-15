@@ -253,9 +253,6 @@ class ThorTerminalActivity : Activity() {
             try {
                 val provider = ThorAiProviderManager(this@ThorTerminalActivity)
                 val settings = provider.settings()
-                if (settings.provider == ThorAiProviderManager.Provider.LOCAL) {
-                    error("Select an online AI provider in THOR Settings to use AI coding in the terminal.")
-                }
                 val prompt = """
                     You are THOR's coding assistant for its built-in Android app terminal.
                     Produce one POSIX /system/bin/sh script for the user's task.
@@ -267,10 +264,14 @@ class ThorTerminalActivity : Activity() {
                     Return a short explanation followed by exactly one fenced bash code block.
                     User task: ${task.take(1200)}
                 """.trimIndent()
-                val answer = if (settings.provider == ThorAiProviderManager.Provider.GEMINI) {
-                    GeminiAssistant.ask(prompt)
-                } else {
-                    provider.ask(prompt, 512)
+                val answer = when (settings.provider) {
+                    ThorAiProviderManager.Provider.GEMINI -> GeminiAssistant.ask(prompt)
+                    ThorAiProviderManager.Provider.LOCAL -> {
+                        val offline = ThorOfflineAi(this@ThorTerminalActivity)
+                        if (!offline.isReady()) offline.initialize()
+                        offline.ask(prompt)
+                    }
+                    else -> provider.ask(prompt, 512)
                 }
                 val fence = 96.toChar().toString().repeat(3)
                 val start = answer.indexOf(fence)
