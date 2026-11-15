@@ -1,5 +1,7 @@
 # THOR Android Assistant
 
+**Android compatibility target:** Android 10 (API 29) and newer. The APK's minimum SDK is set to API 29; device-specific capabilities such as microphone foreground services, notifications, speech recognition, and accessibility navigation still depend on Android version, OEM restrictions, permissions, and installed system services.
+
 THOR is an experimental Android personal assistant project. The active development branch is
 `feature/thor-live-mode`; its draft pull request targets `experiment/boss-speaker-verification`. Keep it separate from the main branch while features are being validated.
 
