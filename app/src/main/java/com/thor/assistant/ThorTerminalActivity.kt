@@ -86,7 +86,7 @@ class ThorTerminalActivity : Activity() {
 
         val terminalScroll = ScrollView(this).apply {
             isFillViewport = true
-            background = terminalSurface(panel)
+            setBackground(terminalSurface(panel))
             setPadding(dp(10), dp(10), dp(10), dp(10))
         }
         output = TextView(this).apply {
@@ -115,7 +115,7 @@ class ThorTerminalActivity : Activity() {
             setHintTextColor(muted)
             setTextColor(Color.WHITE)
             setPadding(dp(10), 0, dp(10), 0)
-            background = terminalSurface(panel)
+            setBackground(terminalSurface(panel))
             imeOptions = EditorInfo.IME_ACTION_SEND
             setOnEditorActionListener { _, actionId, _ ->
                 if (actionId == EditorInfo.IME_ACTION_SEND) { runManualCommand(); true } else false
