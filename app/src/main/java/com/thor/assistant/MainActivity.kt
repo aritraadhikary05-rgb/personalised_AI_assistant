@@ -505,7 +505,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
             setPadding(dp(4), dp(2), dp(4), dp(8))
         }, matchWrap())
         settingsBody.addView(TextView(this).apply {
-            text = "Choose Gemini, OpenAI / ChatGPT, Groq, OpenRouter, Cloudflare, a compatible custom API, or on-device AI. API keys are encrypted on this phone."
+            text = "Choose Gemini, Anthropic Claude, OpenAI, Groq, OpenRouter, Cloudflare, an OpenAI-compatible custom API, or on-device AI. Provider model IDs and endpoints vary; API keys are encrypted on this phone. Live Mode currently uses Gemini only."
             textSize = 12f
             setTextColor(muted)
         }, matchWrap())
