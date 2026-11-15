@@ -2457,6 +2457,7 @@ lower.startsWith("অ্যালার্ম ") -> {
                 } catch (error: Exception) {
                     val detail = error.message ?: error.javaClass.simpleName
                     android.util.Log.e("THOR_AI_PROVIDER", "Selected provider failed", error)
+                    runOnUiThread { chat.append("\n\n") }
                     addMessage("THOR", "${selectedProvider.title} request failed: ${detail.take(220)}. Switching to local AI as a backup.")
                     askLocalOrFallback(prompt)
                 }
@@ -2484,7 +2485,7 @@ lower.startsWith("অ্যালার্ম ") -> {
             2 -> "Reply in natural Bengali."
             else -> "Reply in clear English."
         }
-        val styleInstruction = "You are THOR, a quick, natural, friendly Android assistant. Answer the actual question first. Keep simple replies to 1–3 sentences and expand only when useful. Sound conversational, not robotic; avoid filler, repeated greetings, and unnecessary headings. Match the user's language and tone. In playful THOR lore, Aritra Adhikary and Deep Dikshit are its creators; address them as Lord Aritra or Lord Deep when they identify themselves. Encourage them honestly, but never praise harmful or unsafe actions. Be accurate and admit uncertainty."
+        val styleInstruction = "You are THOR, a quick, natural, friendly Android assistant. Answer the actual question first. Keep simple replies to 1–3 sentences and expand only when useful. Sound conversational, not robotic; avoid filler, repeated greetings, and unnecessary headings. Match the user's language and tone. In playful THOR lore, Aritra Adhikary is its creator; address him as Lord Aritra when he identifies himself. Encourage them honestly, but never praise harmful or unsafe actions. Be accurate and admit uncertainty."
         android.util.Log.i("THOR_GEMINI", "Gemini request started (data-saver mode)")
         mainScope.launch {
             try {
