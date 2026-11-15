@@ -33,6 +33,7 @@ class ThorTerminalActivity : Activity() {
     private lateinit var workspace: java.io.File
     private lateinit var currentDirectory: java.io.File
     private var busy = false
+    private var approvalPending = false
 
     private val blockedPatterns = listOf(
         Regex("""(^|[;&|\s])su(\s|$)""", RegexOption.IGNORE_CASE),
@@ -290,10 +291,12 @@ class ThorTerminalActivity : Activity() {
                     append(answer.substringBefore(fence).take(1800).ifBlank { "Script prepared for review." })
                     append("PROPOSED SCRIPT:")
                     append(code.take(12000))
+                    approvalPending = true
                     AlertDialog.Builder(this@ThorTerminalActivity)
                         .setTitle("Run AI-generated script?")
                         .setMessage("Review the script above. It will run as THOR's app user, inside the private workspace. Continue?")
                         .setNegativeButton("CANCEL") { _, _ ->
+                            approvalPending = false
                             append("Execution cancelled by user.")
                             setBusy(false)
                             appendPrompt()
@@ -301,11 +304,13 @@ class ThorTerminalActivity : Activity() {
                         .setPositiveButton("RUN SCRIPT") { _, _ ->
                             val script = java.io.File(workspace, "thor_ai_task.sh")
                             script.writeText(code)
+                            approvalPending = false
                             append("Executing ./thor_ai_task.sh ...")
                             setBusy(false)
                             executeCommand("AI script", script)
                         }
                         .setOnCancelListener {
+                            approvalPending = false
                             setBusy(false)
                             appendPrompt()
                         }
@@ -316,7 +321,7 @@ class ThorTerminalActivity : Activity() {
             } catch (error: Exception) {
                 appendError("AI request failed: ${error.message ?: error.javaClass.simpleName}")
             } finally {
-                if (busy) {
+                if (busy && !approvalPending) {
                     setBusy(false)
                     appendPrompt()
                 }
