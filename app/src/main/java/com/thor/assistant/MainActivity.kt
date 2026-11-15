@@ -416,6 +416,12 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply { leftMargin = dp(8) })
         homeBody.addView(homeHeader, matchWrap())
+        // Preserve the creator credit on Home, with the single requested attribution.
+        homeBody.addView(creatorEmblemView(), LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            setMargins(dp(2), dp(2), dp(2), dp(2))
+        })
 
         val homeDivider = android.view.View(this).apply {
             setBackgroundColor(Color.rgb(39, 45, 56))
