@@ -31,6 +31,7 @@ class ThorTerminalActivity : Activity() {
     private lateinit var runButton: Button
     private lateinit var aiButton: Button
     private lateinit var workspace: java.io.File
+    private lateinit var currentDirectory: java.io.File
     private var busy = false
 
     private val blockedPatterns = listOf(
@@ -39,12 +40,13 @@ class ThorTerminalActivity : Activity() {
         Regex("""\\b(pm|am|settings|svc)\\s+(disable|enable|grant|revoke|put|delete|reset|force-stop|uninstall|install)\\b""", RegexOption.IGNORE_CASE),
         Regex("""\\brm\\s+(-[^\\s]*r[^\\s]*f|-rf|-fr)\\s+(/|\\.\\.)""", RegexOption.IGNORE_CASE),
         Regex("""(^|\\s)(/system|/vendor|/product|/proc|/sys)(/|\\s|$)"""),
-        Regex("""(^|[/\\\\])\\.\\.([/\\\\]|$)""")
+        Regex("""(^|[/\\])\\.\\.([/\\]|$)""")
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         workspace = java.io.File(filesDir, "thor_terminal").apply { mkdirs() }
+        currentDirectory = workspace
         buildTerminalUi()
         append("THOR TERMINAL 1.0")
         append("Android app sandbox | Working directory: ${workspace.absolutePath}")
@@ -165,12 +167,29 @@ class ThorTerminalActivity : Activity() {
                 append("AI coding: type ask <what you want built> or use ASK THOR AI.")
                 appendPrompt()
             }
+            command.equals("pwd", true) -> { append(currentDirectory.absolutePath); appendPrompt() }
+            command.startsWith("cd ", true) -> changeDirectory(command.substringAfter(" ").trim())
+            command.equals("cd", true) -> changeDirectory("")
             command.startsWith("ask ", true) -> {
                 commandInput.setText(command.substringAfter(' '))
                 requestAiScript()
             }
             else -> executeCommand(command)
         }
+    }
+
+    private fun changeDirectory(path: String) {
+        val target = if (path.isBlank() || path == "~") workspace else java.io.File(currentDirectory, path)
+        val resolved = runCatching { target.canonicalFile }.getOrNull()
+        if (resolved == null || !resolved.path.startsWith(workspace.canonicalPath)) {
+            appendError("Directory is outside THOR's private workspace.")
+        } else if (!resolved.isDirectory) {
+            appendError("Directory not found: $path")
+        } else {
+            currentDirectory = resolved
+            append(currentDirectory.absolutePath)
+        }
+        appendPrompt()
     }
 
     private fun executeCommand(command: String, scriptFile: java.io.File? = null) {
@@ -188,13 +207,16 @@ class ThorTerminalActivity : Activity() {
                     } else {
                         ProcessBuilder("/system/bin/sh", "-c", command)
                     }
-                    val process = builder.directory(workspace).redirectErrorStream(true).start()
+                    val logFile = java.io.File(workspace, ".thor_last_output.txt")
+                    val process = builder.directory(currentDirectory).redirectErrorStream(true)
+                        .redirectOutput(logFile).start()
                     val finished = process.waitFor(10, TimeUnit.SECONDS)
                     if (!finished) {
                         process.destroyForcibly()
                         "Command timed out after 10 seconds."
                     } else {
-                        val text = process.inputStream.bufferedReader().use { it.readText().take(24000) }
+                        val text = logFile.takeIf { it.exists() }?.readText()?.take(24000).orEmpty()
+                        logFile.delete()
                         val status = process.exitValue()
                         (text.ifBlank { if (status == 0) "Completed (exit 0)." else "No output." }) +
                             if (status == 0) "" else "\nExit code: $status"
