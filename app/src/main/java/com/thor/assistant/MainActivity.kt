@@ -887,7 +887,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
         }
         panel.addView(subtitle, matchWrap())
         val creatorEmblem = TextView(this).apply {
-            text = "DEVELOPED AND ENGINEERED BY\nARITRA ADHIKARY AND DEEP DIKSHIT"
+            text = "DEVELOPED AND ENGINEERED BY\nARITRA ADHIKARY"
             textSize = 10f
             gravity = Gravity.CENTER
             letterSpacing = 0.08f
@@ -1011,7 +1011,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun creatorEmblemView(): TextView = TextView(this).apply {
-        text = "DEVELOPED & ENGINEERED BY\nARITRA ADHIKARY  •  DEEP DIKSHIT"
+        text = "DEVELOPED & ENGINEERED BY\nARITRA ADHIKARY"
         textSize = 10f
         gravity = Gravity.CENTER
         letterSpacing = 0.08f
