@@ -587,37 +587,82 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             setPadding(dp(5), dp(5), dp(5), dp(5))
-            setBackground(premiumBackground(Color.rgb(19, 23, 31), Color.rgb(48, 56, 69)))
+            background = premiumBackground(Color.rgb(19, 23, 31), Color.rgb(48, 56, 69))
+            clipToPadding = false
         }
         val navLabels = listOf("Home", "Chat", "Live", "Tools", "Shield", "Settings")
-        val navButtons = mutableListOf<Button>()
+        val navSymbols = listOf("⌂", "▤", "◉", "▦", "◇", "⚙")
+        val navButtons = mutableListOf<LinearLayout>()
+        val navIcons = mutableListOf<TextView>()
+        val navTexts = mutableListOf<TextView>()
+
         fun showTab(index: Int) {
             if (index != 2 && liveSession != null) stopThorLive()
             pages.forEachIndexed { pageIndex, view ->
                 view.visibility = if (pageIndex == index) android.view.View.VISIBLE else android.view.View.GONE
             }
             navButtons.forEachIndexed { buttonIndex, button ->
-                button.setTextColor(if (buttonIndex == index) blue else muted)
+                val selected = buttonIndex == index
+                val tint = if (selected) blue else muted
+                button.isSelected = selected
                 button.setBackground(premiumBackground(
-                    if (buttonIndex == index) Color.rgb(15, 43, 68) else Color.TRANSPARENT,
-                    if (buttonIndex == index) Color.rgb(38, 112, 158) else Color.TRANSPARENT
+                    if (selected) Color.rgb(15, 43, 68) else Color.TRANSPARENT,
+                    if (selected) Color.rgb(38, 112, 158) else Color.TRANSPARENT
                 ))
+                navIcons[buttonIndex].setTextColor(tint)
+                navTexts[buttonIndex].setTextColor(tint)
+                navTexts[buttonIndex].alpha = if (selected) 1f else 0.82f
             }
         }
+
         navLabels.forEachIndexed { index, label ->
-            val button = makeButton(label).apply {
-                textSize = 9.5f
+            val icon = TextView(this).apply {
+                text = navSymbols[index]
+                textSize = 18f
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL)
                 setTextColor(muted)
-                setBackgroundColor(Color.TRANSPARENT)
+            }
+            val title = TextView(this).apply {
+                text = label
+                textSize = 10.5f
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+                letterSpacing = 0.005f
+                setTextColor(muted)
+            }
+            val item = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                isClickable = true
+                isFocusable = true
+                minHeight = dp(54)
+                setPadding(dp(2), dp(5), dp(2), dp(5))
+                contentDescription = "$label tab"
                 setOnClickListener { showTab(index) }
             }
-            navButtons.add(button)
-            nav.addView(button, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            item.addView(icon, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(22)
+            ))
+            item.addView(title, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(16)
+            ).apply { topMargin = dp(2) })
+            navButtons += item
+            navIcons += icon
+            navTexts += title
+            nav.addView(item, LinearLayout.LayoutParams(
+                0, dp(58), 1f
+            ).apply {
+                setMargins(dp(1), 0, dp(1), 0)
+            })
         }
-        nav.background = premiumBackground(Color.rgb(19, 23, 31), Color.rgb(48, 56, 69))
         nav.elevation = dp(2).toFloat()
         root.addView(nav, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(68)
         ).apply { setMargins(dp(2), dp(4), dp(2), dp(4)) })
         setContentView(root)
         showTab(0)
