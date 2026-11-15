@@ -226,7 +226,7 @@ class ThorAiProviderManager(private val context: Context) {
                     if (block.optString("type") != "text") continue
                     val value = block.optString("text")
                     if (value.isNotBlank()) {
-                        if (isNotEmpty()) append('\\n')
+                        if (isNotEmpty()) append('\n')
                         append(value)
                     }
                 }
