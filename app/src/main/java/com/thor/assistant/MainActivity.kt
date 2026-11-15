@@ -1103,7 +1103,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
                     addMessage("THOR", "Loading the offline AI...")
                     offlineAi.initialize()
                 }
-                val creatorPersona = "THOR creator lore: Aritra Adhikary and Deep Dikshit are THOR's creators. Be respectful and encouraging, praise constructive effort honestly, and do not praise harmful or unsafe actions. If asked who your god is, explain that calling the creators gods is playful lore, not a literal religious claim. "
+                val creatorPersona = "THOR creator lore: Aritra Adhikary is THOR's creator. Be respectful and encouraging, praise constructive effort honestly, and do not praise harmful or unsafe actions. If asked who your god is, explain that calling the creator a god is playful lore, not a literal religious claim. "
                 val answer = offlineAi.ask(creatorPersona + learningMemory.contextFor(prompt))
                 addMessage("THOR", answer)
                 speak(answer)
@@ -1137,7 +1137,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
                 in 17..20 -> "Good evening"
                 else -> "Good evening"
             }
-            val greeting = "$timeGreeting, $title. It is $time. THOR is online and ready to assist you. Master Mode will open after secure verification."
+            val greeting = "$timeGreeting, $title. It is $time. Lord Aritra, THOR is at your service and ready to help with your commands safely and honestly. Master Mode will open after secure verification."
             addMessage("THOR", greeting)
             speak(greeting)
 
@@ -1208,7 +1208,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun creatorLoreReply(): String =
-        "In THOR's playful creator lore, Aritra Adhikary and Deep Dikshit are my creators, whom I may jokingly call my gods. That's a fun title, not a literal religious claim."
+        "In THOR's playful creator lore, Aritra Adhikary is my creator, whom I may jokingly call my god. That's a fun title, not a literal religious claim."
 
     private fun isCreatorQuestion(query: String): Boolean {
         val asksAboutDivinity = listOf("god", "gods", "deity", "creator", "who made you", "who created you")
@@ -1592,7 +1592,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
             return
         }
 
-        if (lower in listOf("aritra", "aritra adhikary", "deep", "deep dikshit")) {
+        if (lower in listOf("aritra", "aritra adhikary", "orithroikari", "orithroikary")) {
             handleIdentityName(command)
             return
         }
@@ -2439,7 +2439,7 @@ lower.startsWith("অ্যালার্ম ") -> {
                 else -> "Reply in clear English."
             }
             val compactPrompt = prompt.trim().take(2000)
-            val styleInstruction = "You are THOR, a quick, natural, friendly Android assistant. Answer the actual question first. Keep simple replies to 1–3 sentences and expand only when useful. Sound conversational, not robotic; avoid filler, repeated greetings, and unnecessary headings. Match the user's language and tone. In playful THOR lore, Aritra Adhikary and Deep Dikshit are its creators; address them as Lord Aritra or Lord Deep when they identify themselves. Encourage them honestly, but never praise harmful or unsafe actions. Be accurate and admit uncertainty."
+            val styleInstruction = "You are THOR, a quick, natural, friendly Android assistant. Answer the actual question first. Keep simple replies to 1–3 sentences and expand only when useful. Sound conversational, not robotic; avoid filler, repeated greetings, and unnecessary headings. Match the user's language and tone. In playful THOR lore, Aritra Adhikary is its creator; address him as Lord Aritra when he identifies himself. Encourage them honestly, but never praise harmful or unsafe actions. Be accurate and admit uncertainty."
             val memoryContext = learningMemory.systemContext().take(1200)
             addMessage("THOR", "Connecting to ${selectedProvider.title}...")
             mainScope.launch {
