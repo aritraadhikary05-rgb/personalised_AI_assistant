@@ -2202,7 +2202,7 @@ lower.startsWith("অ্যালার্ম ") -> {
             true
         )
         val help = TextView(this).apply {
-            text = "Firebase Gemini uses THOR's managed connection. Your saved Google Gemini API key is shared by Gemini chat and Live Mode, so Live Mode needs no separate Worker URL or Firebase sign-in. OpenAI uses your own API key; API billing is separate from ChatGPT subscriptions. Groq and OpenRouter use standard endpoints. Cloudflare/custom need a full HTTPS chat-completions endpoint. Provider quotas and charges still apply."
+            text = "Firebase Gemini uses THOR's managed connection. Google Gemini (own API key) shares its saved key with Live Mode; Live Mode currently supports Gemini only. Claude uses Anthropic's native Messages API. OpenAI, Groq and OpenRouter use OpenAI-compatible chat endpoints. Cloudflare and custom providers need a full HTTPS OpenAI-compatible chat-completions endpoint. API billing, model access, quotas and rate limits are controlled by each provider."
             textSize = 12f
             setTextColor(Color.LTGRAY)
             setPadding(0, 10, 0, 4)
