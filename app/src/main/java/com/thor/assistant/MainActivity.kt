@@ -455,6 +455,17 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
         val memoryButton = makeButton("PERSONAL MEMORY")
         memoryButton.setOnClickListener { showPersonalMemoryManager() }
         featuresBody.addView(memoryButton, matchWrap())
+        val terminalButton = makeButton("OPEN DEVELOPER TERMINAL")
+        terminalButton.setOnClickListener {
+            startActivity(Intent(this, ThorTerminalActivity::class.java))
+        }
+        featuresBody.addView(terminalButton, matchWrap())
+        featuresBody.addView(TextView(this).apply {
+            text = "Optional CMD-style workspace for manual commands and AI-assisted scripting. Commands run under THOR's Android app identity, not as root."
+            textSize = 11f
+            setTextColor(muted)
+            setPadding(dp(4), dp(2), dp(4), dp(10))
+        }, matchWrap())
         contentFrame.addView(scrollPage(featuresBody), android.widget.FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         ).apply { })
