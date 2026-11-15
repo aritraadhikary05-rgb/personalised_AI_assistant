@@ -272,7 +272,7 @@ class ThorTerminalActivity : Activity() {
                 } else {
                     provider.ask(prompt, 512)
                 }
-                val fence = String.fromCharCode(96).repeat(3)
+                val fence = 96.toChar().toString().repeat(3)
                 val start = answer.indexOf(fence)
                 val end = if (start >= 0) answer.indexOf(fence, start + fence.length) else -1
                 val code = if (start >= 0 && end > start) {
