@@ -407,10 +407,10 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
             )
             setTextColor(Color.rgb(174, 205, 239))
             setPadding(dp(12), dp(9), dp(12), dp(9))
-            background = premiumBackground(
+            setBackground(premiumBackground(
                 Color.rgb(18, 29, 44),
                 Color.rgb(49, 77, 110)
-            )
+            ))
         }
         homeHeader.addView(identityChip, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
@@ -451,10 +451,10 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(dp(10), dp(8), dp(10), dp(8))
-            background = premiumBackground(
+            setBackground(premiumBackground(
                 Color.rgb(15, 21, 31),
                 Color.rgb(43, 59, 79)
-            )
+            ))
             elevation = dp(2).toFloat()
         }
         homeReactor = ThorHudView(this)
