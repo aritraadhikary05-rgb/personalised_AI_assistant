@@ -91,6 +91,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
         val user = auth.currentUser
         if (user == null) {
             masterVerifiedThisSession = false
+            openTerminalAfterMasterVerification = false
         } else {
             user.getIdToken(false)
                 .addOnSuccessListener { tokenResult ->
@@ -1378,8 +1379,10 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
                         }
                         delay(3000L)
                     }
+                    openTerminalAfterMasterVerification = false
                     addMessage("THOR", "No approval arrived before the three-minute request expired.")
                 } catch (error: Exception) {
+                    openTerminalAfterMasterVerification = false
                     addMessage("THOR", "Master approval failed: ${error.message}")
                 }
             }
