@@ -21,6 +21,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
@@ -142,7 +144,7 @@ class ThorAiProviderManager(private val context: Context) {
         output.toString().trim().ifBlank { error("${config.provider.title} returned an empty response.") }
     }
 
-    private fun streamOpenAiCompatible(
+    private suspend fun streamOpenAiCompatible(
         config: Settings, prompt: String, maxTokens: Int, emit: (String) -> Unit
     ) {
         val endpoint = config.endpoint.trim()
@@ -165,32 +167,22 @@ class ThorAiProviderManager(private val context: Context) {
             }
             .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
-        httpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw providerHttpError(config, response.code, response.body?.string().orEmpty())
-            val reader = response.body?.charStream()?.buffered() ?: error("Provider returned an empty stream.")
-            reader.useLines { lines ->
-                lines.forEach { line ->
-                    if (line.startsWith("data:")) {
-                        val data = line.substringAfter("data:").trim()
-                        if (data.isNotEmpty() && data != "[DONE]") {
-                            val json = runCatching { JSONObject(data) }.getOrNull() ?: return@forEach
-                            val delta = json.optJSONArray("choices")?.optJSONObject(0)
-                                ?.optJSONObject("delta")?.opt("content")
-                            when (delta) {
-                                is String -> emit(delta)
-                                is JSONArray -> for (i in 0 until delta.length()) {
-                                    val item = delta.optJSONObject(i)
-                                    emit(item?.optString("text").orEmpty())
-                                }
-                            }
-                        }
-                    }
+        consumeSse(request, config) { data ->
+            if (data == "[DONE]") return@consumeSse
+            val json = runCatching { JSONObject(data) }.getOrNull() ?: return@consumeSse
+            val delta = json.optJSONArray("choices")?.optJSONObject(0)
+                ?.optJSONObject("delta")?.opt("content")
+            when (delta) {
+                is String -> emit(delta)
+                is JSONArray -> for (i in 0 until delta.length()) {
+                    val item = delta.optJSONObject(i)
+                    emit(item?.optString("text").orEmpty())
                 }
             }
         }
     }
 
-    private fun streamClaude(
+    private suspend fun streamClaude(
         config: Settings, prompt: String, maxTokens: Int, emit: (String) -> Unit
     ) {
         val endpoint = config.endpoint.trim()
@@ -207,28 +199,20 @@ class ThorAiProviderManager(private val context: Context) {
             .header("Accept", "text/event-stream")
             .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
-        httpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw providerHttpError(config, response.code, response.body?.string().orEmpty())
-            val reader = response.body?.charStream()?.buffered() ?: error("Claude returned an empty stream.")
-            reader.useLines { lines ->
-                lines.forEach { line ->
-                    if (line.startsWith("data:")) {
-                        val json = runCatching { JSONObject(line.substringAfter("data:").trim()) }.getOrNull()
-                            ?: return@forEach
-                        if (json.optString("type") == "content_block_delta") {
-                            emit(json.optJSONObject("delta")?.optString("text").orEmpty())
-                        }
-                    }
-                }
+        consumeSse(request, config) { data ->
+            val json = runCatching { JSONObject(data) }.getOrNull() ?: return@consumeSse
+            if (json.optString("type") == "content_block_delta") {
+                emit(json.optJSONObject("delta")?.optString("text").orEmpty())
             }
         }
     }
 
-    private fun streamGeminiApi(
+    private suspend fun streamGeminiApi(
         config: Settings, prompt: String, maxTokens: Int, emit: (String) -> Unit
     ) {
         val base = config.endpoint.trim().replace("{model}", config.model)
         require(base.startsWith("https://", true)) { "Gemini endpoint must use HTTPS." }
+        require(base.contains(":generateContent")) { "Gemini endpoint must end with :generateContent." }
         val streamUrl = base.replace(":generateContent", ":streamGenerateContent") +
             if (base.contains("?")) "&alt=sse" else "?alt=sse"
         val body = JSONObject()
@@ -241,20 +225,57 @@ class ThorAiProviderManager(private val context: Context) {
             .header("Accept", "text/event-stream")
             .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
-        httpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw providerHttpError(config, response.code, response.body?.string().orEmpty())
-            val reader = response.body?.charStream()?.buffered() ?: error("Gemini returned an empty stream.")
-            reader.useLines { lines ->
-                lines.forEach { line ->
-                    if (line.startsWith("data:")) {
-                        val json = runCatching { JSONObject(line.substringAfter("data:").trim()) }.getOrNull()
-                            ?: return@forEach
-                        val parts = json.optJSONArray("candidates")?.optJSONObject(0)
-                            ?.optJSONObject("content")?.optJSONArray("parts") ?: return@forEach
-                        for (i in 0 until parts.length()) emit(parts.optJSONObject(i)?.optString("text").orEmpty())
+        consumeSse(request, config) { data ->
+            val json = runCatching { JSONObject(data) }.getOrNull() ?: return@consumeSse
+            val parts = json.optJSONArray("candidates")?.optJSONObject(0)
+                ?.optJSONObject("content")?.optJSONArray("parts") ?: return@consumeSse
+            for (i in 0 until parts.length()) emit(parts.optJSONObject(i)?.optString("text").orEmpty())
+        }
+    }
+
+    /**
+     * Reads complete SSE events, not individual lines, and ties the socket to
+     * the calling coroutine so leaving the chat or cancelling a request closes
+     * the network connection immediately.
+     */
+    private suspend fun consumeSse(
+        request: Request,
+        config: Settings,
+        onData: (String) -> Unit
+    ) {
+        val job = currentCoroutineContext()[Job]
+        val call = httpClient.newCall(request)
+        val cancellation = job?.invokeOnCompletion { cause ->
+            if (cause is CancellationException) call.cancel()
+        }
+        try {
+            call.execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw providerHttpError(config, response.code, response.body?.string().orEmpty())
+                }
+                val reader = response.body?.charStream()?.buffered()
+                    ?: error("${config.provider.title} returned an empty stream.")
+                reader.use {
+                    val eventData = StringBuilder()
+                    while (true) {
+                        job?.ensureActive()
+                        val line = it.readLine() ?: break
+                        if (line.isEmpty()) {
+                            if (eventData.isNotEmpty()) {
+                                onData(eventData.toString())
+                                eventData.setLength(0)
+                            }
+                        } else if (line.startsWith("data:")) {
+                            if (eventData.isNotEmpty()) eventData.append('\n')
+                            eventData.append(line.substring(5).trimStart())
+                        }
                     }
+                    if (eventData.isNotEmpty()) onData(eventData.toString())
                 }
             }
+        } finally {
+            cancellation?.dispose()
+            call.cancel()
         }
     }
 
