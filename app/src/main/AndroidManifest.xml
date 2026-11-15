@@ -17,8 +17,9 @@
         android:icon="@mipmap/thor_launcher_icon"
         android:roundIcon="@mipmap/thor_launcher_icon"
         android:label="THOR"
-        android:theme="@android:style/Theme.Material.NoActionBar"
+        android:theme="@style/Theme.Thor"
         android:usesCleartextTraffic="false">
+        <activity android:name=".ThorTerminalActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>

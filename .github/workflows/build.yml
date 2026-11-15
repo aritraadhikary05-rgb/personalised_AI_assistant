@@ -84,6 +84,8 @@ jobs:
           test -s "$APK"
           unzip -t "$APK" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "package: name='com.thor.assistant'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "sdkVersion:'29'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "targetSdkVersion:'35'"
 
       - name: Upload APK
         id: upload_apk
