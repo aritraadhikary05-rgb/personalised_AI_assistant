@@ -1171,10 +1171,12 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
                         }
                     }
                     .addOnFailureListener {
+                        openTerminalAfterMasterVerification = false
                         addMessage("THOR", "I couldn't verify the saved Master session. Please connect to the internet and try again.")
                     }
             }
         } else {
+            openTerminalAfterMasterVerification = false
             val message = "Hello, $identity. I haven't verified you as THOR's configured owner."
             addMessage("THOR", message)
             speak(message)
@@ -1218,6 +1220,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
 
     private fun showMasterModeSetupDialog() {
         if (!firebaseReady) {
+            openTerminalAfterMasterVerification = false
             addMessage("THOR", "Firebase is not initialized. Check the Firebase configuration first.")
             return
         }
@@ -1243,7 +1246,10 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
                 masterApprovalClient.baseUrl = endpoint.text.toString()
                 authenticateAndRequestMaster()
             }
-            .setNeutralButton("CANCEL", null)
+            .setNeutralButton("CANCEL") { _, _ ->
+                openTerminalAfterMasterVerification = false
+            }
+            .setOnCancelListener { openTerminalAfterMasterVerification = false }
             .show()
     }
 
@@ -1254,6 +1260,7 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
     private fun signInWithGoogle(onComplete: (Boolean) -> Unit) {
         val clientIdResource = resources.getIdentifier("default_web_client_id", "string", packageName)
         if (clientIdResource == 0) {
+            openTerminalAfterMasterVerification = false
             addMessage("THOR", "Google sign-in is not configured yet. Enable Google in Firebase Authentication, add this app's SHA fingerprints, download the updated google-services.json, and rebuild THOR.")
             onComplete(false)
             return
@@ -1290,10 +1297,12 @@ class MainActivity : FragmentActivity(), TextToSpeech.OnInitListener {
                         onComplete(true)
                     }
                     .addOnFailureListener { error ->
+                        openTerminalAfterMasterVerification = false
                         addMessage("THOR", "Firebase Google sign-in failed: ${error.localizedMessage}")
                         onComplete(false)
                     }
             } catch (error: Exception) {
+                openTerminalAfterMasterVerification = false
                 addMessage("THOR", "Google sign-in cancelled or failed: ${error.localizedMessage ?: error.javaClass.simpleName}")
                 onComplete(false)
             }
